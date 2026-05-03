@@ -26,7 +26,8 @@ async def get_current_user(
         raise credentials_exception
     
     from sqlalchemy import select
-    result = await db.execute(select(User).where(User.id == user_id))
+    from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+    result = await db.execute(select(User).where(User.id == PG_UUID(user_id)))
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
