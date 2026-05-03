@@ -183,7 +183,9 @@ async def create_shift(shift_in: ShiftCreate, db: AsyncSession = Depends(get_db)
     db.add(shift)
     await db.commit()
     await db.refresh(shift)
-    return shift@router.get("/shifts/{shift_id}", response_model=ShiftResponse)
+    return shift
+
+@router.get("/shifts/{shift_id}", response_model=ShiftResponse)
 async def get_shift(shift_id: int, db: AsyncSession = Depends(get_db)):
     shift = await db.get(Shift, shift_id)
     if not shift:
