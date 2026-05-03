@@ -3,13 +3,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from app.core.database import get_db
 from app.core.deps import require_role
-from app.models.users import Userfrom app.models.cities import City
+from app.models.users import User
+from app.models.cities import City
 from app.models.posts import Post
 from app.models.shifts import Shift
 from app.models.shift_assignments import ShiftAssignment
 from app.models.journal_entries import JournalEntry
-from app.schemas.user import UserCreate, UserUpdate, UserResponsefrom app.schemas.city import CityCreate, CityUpdate, CityResponse
-from app.schemas.post import PostCreate, PostUpdate, PostResponsefrom app.schemas.shift import ShiftCreate, ShiftUpdate, ShiftResponse
+from app.schemas.user import UserCreate, UserUpdate, UserResponse
+from app.schemas.city import CityCreate, CityUpdate, CityResponse
+from app.schemas.post import PostCreate, PostUpdate, PostResponse
+from app.schemas.shift import ShiftCreate, ShiftUpdate, ShiftResponse
 from app.schemas.journal import JournalEntryResponse
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -77,7 +80,8 @@ async def delete_user(user_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     await db.delete(user)
     await db.commit()
-    return None# -- Города --
+    return None
+# -- Города --
 @router.get("/cities", response_model=list[CityResponse])
 async def get_cities(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(City))
