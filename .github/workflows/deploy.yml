@@ -21,5 +21,6 @@ jobs:
           passphrase: ${{ secrets.INPUT_PASSPHRASE }}
           script: |
             cd /home/vosvod/journal
-            git pull origin API_dev
+            git fetch origin
+            git reset --hard origin/API_dev
             sudo systemctl restart vosvod
