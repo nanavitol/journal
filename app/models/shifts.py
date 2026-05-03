@@ -11,7 +11,8 @@ class Shift(Base):
     shift_date = Column(Date, nullable=False)
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True), nullable=False)
-    status = Column(Enum('planned', 'active', 'completed', name='shift_status'), nullable=False, server_default='planned')
+    #status = Column(Enum('planned', 'active', 'completed', name='shift_status'), nullable=False, server_default='planned')
+    status = Column(String(20), nullable=False, default='planned')
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
