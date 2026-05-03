@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, Boolean, DateTime, func, ForeignKey, UniqueConstraint, Index
+from sqlalchemy import Column, BigInteger, Boolean, DateTime, func, ForeignKey, UniqueConstraint, Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -14,7 +14,7 @@ class ShiftAssignment(Base):
     
     __table_args__ = (
         UniqueConstraint('shift_id', 'user_id', name='uq_shift_user'),
-        Index('ix_shift_leader_unique', 'shift_id', unique=True, postgresql_where=Column('is_leader')),
+        Index('ix_shift_leader_unique', 'shift_id', unique=True, postgresql_where=text('is_leader IS TRUE')),
         {"sqlite_autoincrement": True},
     )
     

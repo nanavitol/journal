@@ -26,3 +26,6 @@ class ShiftResponse(ShiftBase):
 
     class Config:
         from_attributes = True
+
+class ShiftStatusUpdate(BaseModel):
+    status: str

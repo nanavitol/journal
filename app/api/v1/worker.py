@@ -25,7 +25,6 @@ async def get_profile(current_user: User = Depends(get_current_user)):
 async def update_profile(
     photo_url: str = None,
     phone: str = None,
-    rank: str = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -33,8 +32,6 @@ async def update_profile(
         setattr(current_user, "photo_url", photo_url)
     if phone is not None:
         setattr(current_user, "phone", phone)
-    if rank is not None:
-        setattr(current_user, "rank", rank)
     await db.commit()
     await db.refresh(current_user)
     return current_user
@@ -44,7 +41,11 @@ async def get_colleagues(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = select(User).where(User.city_id == current_user.city_id, User.id != current_user.id)
+    stmt = select(User).where(
+        User.city_id == current_user.city_id,
+        User.id != current_user.id,
+        User.role == "worker"
+    )
     result = await db.execute(stmt)
     colleagues = result.scalars().all()
     return colleagues

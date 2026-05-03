@@ -25,6 +25,14 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    # Check if password change is required
+    if not user.password_changed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Password change required",
+            headers={"X-Require-Password-Change": "true"},
+        )
+    
     access_token = create_access_token(
         data={"sub": str(user.id), "login": user.login, "role": user.role}
     )
