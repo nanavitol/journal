@@ -21,7 +21,7 @@ class ShiftUpdate(BaseModel):
 
 class ShiftResponse(ShiftBase):
     id: int
-    created_by: Optional[int] = None
+    created_by: Optional[str] = None
     created_at: datetime
 
     class Config:

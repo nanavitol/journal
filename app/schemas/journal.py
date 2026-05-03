@@ -12,7 +12,7 @@ class JournalEntryCreate(JournalEntryBase):
 class JournalEntryResponse(JournalEntryBase):
     id: int
     shift_id: int
-    user_id: int
+    user_id: str
     full_name_snapshot: str
     created_at: datetime
 

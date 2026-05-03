@@ -19,8 +19,9 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 # -- Пользователи --
 @router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def create_user(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
-    from app.core.security import get_password_hash    import uuid
+async def create_user(user_in: UserCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
+    from app.core.security import get_password_hash
+    import uuid
     from sqlalchemy.dialects.postgresql import UUID
     # Проверка уникальности
     for field in ["email", "login"]:
@@ -30,7 +31,8 @@ async def create_user(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
         if result.scalar_one_or_none():
             raise HTTPException(status_code=400, detail=f"{field} already exists")
     # Генерация логина, если не задан
-    login = user_in.login    if not login:
+    login = user_in.login
+    if not login:
         translit = str.maketrans("абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ",
                                   "abvgdeejzijklmnoprstufhzcss_yyejujaABVGDEEJZIJKLMNOPRSTUFHZCSS_YYEJUJA")
         base = ''.join(c for c in user_in.full_name.lower().translate(translit) if c.isalnum())
@@ -57,14 +59,14 @@ async def create_user(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     return user
 
 @router.get("/users/{user_id}", response_model=UserResponse)
-async def get_user(user_id: str, db: AsyncSession = Depends(get_db)):
+async def get_user(user_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
 @router.put("/users/{user_id}", response_model=UserResponse)
-async def update_user(user_id: str, user_in: UserUpdate, db: AsyncSession = Depends(get_db)):
+async def update_user(user_id: str, user_in: UserUpdate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -75,21 +77,22 @@ async def update_user(user_id: str, user_in: UserUpdate, db: AsyncSession = Depe
     return user
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(user_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_user(user_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     await db.delete(user)
     await db.commit()
     return None
+
 # -- Города --
 @router.get("/cities", response_model=list[CityResponse])
-async def get_cities(db: AsyncSession = Depends(get_db)):
+async def get_cities(db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     result = await db.execute(select(City))
     return result.scalars().all()
 
 @router.post("/cities", response_model=CityResponse, status_code=status.HTTP_201_CREATED)
-async def create_city(city_in: CityCreate, db: AsyncSession = Depends(get_db)):
+async def create_city(city_in: CityCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     city = City(**city_in.dict())
     db.add(city)
     await db.commit()
@@ -97,14 +100,14 @@ async def create_city(city_in: CityCreate, db: AsyncSession = Depends(get_db)):
     return city
 
 @router.get("/cities/{city_id}", response_model=CityResponse)
-async def get_city(city_id: int, db: AsyncSession = Depends(get_db)):
+async def get_city(city_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     city = await db.get(City, city_id)
     if not city:
         raise HTTPException(status_code=404, detail="City not found")
     return city
 
 @router.put("/cities/{city_id}", response_model=CityResponse)
-async def update_city(city_id: int, city_in: CityUpdate, db: AsyncSession = Depends(get_db)):
+async def update_city(city_id: int, city_in: CityUpdate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     city = await db.get(City, city_id)
     if not city:
         raise HTTPException(status_code=404, detail="City not found")
@@ -115,7 +118,7 @@ async def update_city(city_id: int, city_in: CityUpdate, db: AsyncSession = Depe
     return city
 
 @router.delete("/cities/{city_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_city(city_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_city(city_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     city = await db.get(City, city_id)
     if not city:
         raise HTTPException(status_code=404, detail="City not found")
@@ -125,12 +128,12 @@ async def delete_city(city_id: int, db: AsyncSession = Depends(get_db)):
 
 # -- Посты --
 @router.get("/posts", response_model=list[PostResponse])
-async def get_posts(db: AsyncSession = Depends(get_db)):
+async def get_posts(db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     result = await db.execute(select(Post))
     return result.scalars().all()
 
 @router.post("/posts", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
-async def create_post(post_in: PostCreate, db: AsyncSession = Depends(get_db)):
+async def create_post(post_in: PostCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     post = Post(**post_in.dict())
     db.add(post)
     await db.commit()
@@ -138,14 +141,14 @@ async def create_post(post_in: PostCreate, db: AsyncSession = Depends(get_db)):
     return post
 
 @router.get("/posts/{post_id}", response_model=PostResponse)
-async def get_post(post_id: int, db: AsyncSession = Depends(get_db)):
+async def get_post(post_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     post = await db.get(Post, post_id)
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
     return post
 
 @router.put("/posts/{post_id}", response_model=PostResponse)
-async def update_post(post_id: int, post_in: PostUpdate, db: AsyncSession = Depends(get_db)):
+async def update_post(post_id: int, post_in: PostUpdate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     post = await db.get(Post, post_id)
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
@@ -156,7 +159,7 @@ async def update_post(post_id: int, post_in: PostUpdate, db: AsyncSession = Depe
     return post
 
 @router.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_post(post_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_post(post_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     post = await db.get(Post, post_id)
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
@@ -166,12 +169,12 @@ async def delete_post(post_id: int, db: AsyncSession = Depends(get_db)):
 
 # -- Смены --
 @router.get("/shifts", response_model=list[ShiftResponse])
-async def get_shifts(db: AsyncSession = Depends(get_db)):
+async def get_shifts(db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     result = await db.execute(select(Shift))
     return result.scalars().all()
 
 @router.post("/shifts", response_model=ShiftResponse, status_code=status.HTTP_201_CREATED)
-async def create_shift(shift_in: ShiftCreate, db: AsyncSession = Depends(get_db)):
+async def create_shift(shift_in: ShiftCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     # Проверка поста
     post = await db.get(Post, shift_in.post_id)
     if not post:
@@ -188,14 +191,14 @@ async def create_shift(shift_in: ShiftCreate, db: AsyncSession = Depends(get_db)
     return shift
 
 @router.get("/shifts/{shift_id}", response_model=ShiftResponse)
-async def get_shift(shift_id: int, db: AsyncSession = Depends(get_db)):
+async def get_shift(shift_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     shift = await db.get(Shift, shift_id)
     if not shift:
         raise HTTPException(status_code=404, detail="Shift not found")
     return shift
 
 @router.put("/shifts/{shift_id}", response_model=ShiftResponse)
-async def update_shift(shift_id: int, shift_in: ShiftUpdate, db: AsyncSession = Depends(get_db)):
+async def update_shift(shift_id: int, shift_in: ShiftUpdate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     shift = await db.get(Shift, shift_id)
     if not shift:
         raise HTTPException(status_code=404, detail="Shift not found")
@@ -206,7 +209,7 @@ async def update_shift(shift_id: int, shift_in: ShiftUpdate, db: AsyncSession = 
     return shift
 
 @router.delete("/shifts/{shift_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_shift(shift_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_shift(shift_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     shift = await db.get(Shift, shift_id)
     if not shift:
         raise HTTPException(status_code=404, detail="Shift not found")
@@ -216,7 +219,7 @@ async def delete_shift(shift_id: int, db: AsyncSession = Depends(get_db)):
 
 # -- Назначения --
 @router.post("/shifts/{shift_id}/assign", status_code=status.HTTP_201_CREATED)
-async def assign_to_shift(shift_id: int, user_id: str, is_leader: bool = False, db: AsyncSession = Depends(get_db)):
+async def assign_to_shift(shift_id: int, user_id: str, is_leader: bool = False, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     shift = await db.get(Shift, shift_id)
     if not shift:
         raise HTTPException(status_code=404, detail="Shift not found")
@@ -240,7 +243,8 @@ async def assign_to_shift(shift_id: int, user_id: str, is_leader: bool = False, 
     from datetime import date
     stmt = select(Shift).join(ShiftAssignment).where(
         ShiftAssignment.user_id == user_id,
-        Shift.shift_date == shift.shift_date    )
+        Shift.shift_date == shift.shift_date
+    )
     result = await db.execute(stmt)
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="User already assigned to another shift on this day")
@@ -257,7 +261,7 @@ async def assign_to_shift(shift_id: int, user_id: str, is_leader: bool = False, 
     return {"message": "Assigned successfully"}
 
 @router.delete("/shifts/{shift_id}/assign/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def unassign_from_shift(shift_id: int, user_id: str, db: AsyncSession = Depends(get_db)):
+async def unassign_from_shift(shift_id: int, user_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     stmt = select(ShiftAssignment).where(ShiftAssignment.shift_id == shift_id, ShiftAssignment.user_id == user_id)
     result = await db.execute(stmt)
     assignment = result.scalar_one_or_none()
@@ -273,7 +277,8 @@ async def get_journal(
     shift_id: int = None,
     date_from: str = None,
     date_to: str = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("admin"))
 ):
     stmt = select(JournalEntry)
     conditions = []
