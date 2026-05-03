@@ -26,7 +26,8 @@ async def create_user(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     for field in ["email", "login"]:
         val = getattr(user_in, field)
         stmt = select(User).where(getattr(User, field) == val)
-        if await db.execute(stmt):
+        result = await db.execute(stmt)
+        if result.scalar_one_or_none():
             raise HTTPException(status_code=400, detail=f"{field} already exists")
     # Генерация логина, если не задан
     login = user_in.login    if not login:
@@ -177,7 +178,8 @@ async def create_shift(shift_in: ShiftCreate, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=404, detail="Post not found")
     # Проверка уникальности (пост + дата)
     stmt = select(Shift).where(Shift.post_id == shift_in.post_id, Shift.shift_date == shift_in.shift_date)
-    if await db.execute(stmt):
+    result = await db.execute(stmt)
+    if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Shift for this post and date already exists")
     shift = Shift(**shift_in.dict())
     db.add(shift)
@@ -231,19 +233,22 @@ async def assign_to_shift(shift_id: int, user_id: str, is_leader: bool = False, 
         raise HTTPException(status_code=400, detail="Max workers reached")
     # Проверка: не назначен ли уже в эту смену
     stmt = select(ShiftAssignment).where(ShiftAssignment.shift_id == shift_id, ShiftAssignment.user_id == user_id)
-    if await db.execute(stmt):
+    result = await db.execute(stmt)
+    if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="User already assigned to this shift")
     # Проверка: нет ли смены у сотрудника в тот же день
     from datetime import date
     stmt = select(Shift).join(ShiftAssignment).where(
         ShiftAssignment.user_id == user_id,
         Shift.shift_date == shift.shift_date    )
-    if await db.execute(stmt):
+    result = await db.execute(stmt)
+    if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="User already assigned to another shift on this day")
     # Только один старший на смене
     if is_leader:
         stmt = select(ShiftAssignment).where(ShiftAssignment.shift_id == shift_id, ShiftAssignment.is_leader == True)
-        if await db.execute(stmt):
+        result = await db.execute(stmt)
+        if result.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Only one leader per shift")
     assignment = ShiftAssignment(shift_id=shift_id, user_id=user_id, is_leader=is_leader)
     db.add(assignment)
