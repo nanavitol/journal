@@ -4,11 +4,11 @@ from app.core.database import get_db
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.core.deps import get_current_user
 from app.models.users import User
-from app.schemas.auth import Token, LoginRequest, ChangePasswordRequest
+from app.schemas.auth import Token, LoginRequest, ChangePasswordRequest, LoginResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=LoginResponse)
 async def login(
     login_request: LoginRequest,
     db: AsyncSession = Depends(get_db)
@@ -25,18 +25,17 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Check if password change is required
-    if not user.password_changed:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Password change required",
-            headers={"X-Require-Password-Change": "true"},
-        )
-    
+    # Создаем токен в любом случае
     access_token = create_access_token(
         data={"sub": str(user.id), "login": user.login, "role": user.role}
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    
+    # Возвращаем токен и флаг необходимости смены пароля
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        require_password_change=not user.password_changed
+    )
 
 @router.post("/change-password")
 async def change_password(
@@ -44,14 +43,16 @@ async def change_password(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    # Verify old password
-    if not verify_password(password_request.old_password, current_user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Incorrect old password"
-        )
+    # Если это первый вход (password_changed=false), не требуем старый пароль
+    if current_user.password_changed:
+        # Проверяем старый пароль
+        if not verify_password(password_request.old_password, current_user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Incorrect old password"
+            )
     
-    # Update password
+    # Обновляем пароль
     current_user.password_hash = get_password_hash(password_request.new_password)
     current_user.password_changed = True
     await db.commit()

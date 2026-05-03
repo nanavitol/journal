@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from app.core.database import get_db
-from app.core.deps import require_role
+from app.core.deps import require_role, get_current_user
 from app.models.users import User
 from app.models.cities import City
 from app.models.posts import Post
@@ -18,6 +18,22 @@ from app.schemas.journal import JournalEntryResponse
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 # -- Пользователи --
+@router.get("/users", response_model=list[UserResponse])
+async def get_users(
+    city_id: int = None,
+    role: str = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("admin"))
+):
+    """Получить список пользователей с фильтрами."""
+    stmt = select(User)
+    if city_id:
+        stmt = stmt.where(User.city_id == city_id)
+    if role:
+        stmt = stmt.where(User.role == role)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
 @router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(user_in: UserCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     from app.core.security import get_password_hash
@@ -128,8 +144,15 @@ async def delete_city(city_id: int, db: AsyncSession = Depends(get_db), current_
 
 # -- Посты --
 @router.get("/posts", response_model=list[PostResponse])
-async def get_posts(db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
-    result = await db.execute(select(Post))
+async def get_posts(
+    city_id: int = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("admin"))
+):
+    stmt = select(Post)
+    if city_id:
+        stmt = stmt.where(Post.city_id == city_id)
+    result = await db.execute(stmt)
     return result.scalars().all()
 
 @router.post("/posts", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
@@ -169,9 +192,39 @@ async def delete_post(post_id: int, db: AsyncSession = Depends(get_db), current_
 
 # -- Смены --
 @router.get("/shifts", response_model=list[ShiftResponse])
-async def get_shifts(db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
-    result = await db.execute(select(Shift))
+async def get_shifts(
+    city_id: int = None,
+    post_id: int = None,
+    shift_date: str = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("admin"))
+):
+    stmt = select(Shift)
+    if city_id:
+        stmt = stmt.join(Post).where(Post.city_id == city_id)
+    if post_id:
+        stmt = stmt.where(Shift.post_id == post_id)
+    if shift_date:
+        stmt = stmt.where(Shift.shift_date == shift_date)
+    result = await db.execute(stmt)
     return result.scalars().all()
+
+@router.patch("/shifts/{shift_id}/status", response_model=ShiftResponse)
+async def update_shift_status(
+    shift_id: int,
+    status: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("admin"))
+):
+    shift = await db.get(Shift, shift_id)
+    if not shift:
+        raise HTTPException(status_code=404, detail="Shift not found")
+    if status not in ["planned", "active", "completed"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    shift.status = status
+    await db.commit()
+    await db.refresh(shift)
+    return shift
 
 @router.post("/shifts", response_model=ShiftResponse, status_code=status.HTTP_201_CREATED)
 async def create_shift(shift_in: ShiftCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_role("admin"))):
@@ -293,3 +346,44 @@ async def get_journal(
     result = await db.execute(stmt)
     entries = result.scalars().all()
     return entries
+
+@router.post("/journal/{shift_id}", response_model=JournalEntryResponse, status_code=status.HTTP_201_CREATED)
+async def create_journal_entry(
+    shift_id: int,
+    note: str,
+    entry_type: str = "routine",
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Создать запись в журнале. Admin может создавать если он назначен на активную смену."""
+    shift = await db.get(Shift, shift_id)
+    if not shift:
+        raise HTTPException(status_code=404, detail="Shift not found")
+    
+    # Проверяем, что смена активна
+    if shift.status != "active":
+        raise HTTPException(status_code=400, detail="Can only add entries to active shifts")
+    
+    # Проверяем, что пользователь назначен на смену
+    stmt = select(ShiftAssignment).where(
+        ShiftAssignment.shift_id == shift_id,
+        ShiftAssignment.user_id == current_user.id
+    )
+    result = await db.execute(stmt)
+    assignment = result.scalar_one_or_none()
+    
+    if not assignment:
+        raise HTTPException(status_code=403, detail="You are not assigned to this shift")
+    
+    # Создаем запись
+    entry = JournalEntry(
+        shift_id=shift_id,
+        user_id=current_user.id,
+        full_name_snapshot=current_user.full_name,
+        note=note,
+        entry_type=entry_type
+    )
+    db.add(entry)
+    await db.commit()
+    await db.refresh(entry)
+    return entry
