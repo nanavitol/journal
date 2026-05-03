@@ -279,19 +279,28 @@ async def assign_to_shift(shift_id: int, user_id: str, is_leader: bool = False, 
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Явно загружаем пост, чтобы избежать ленивой загрузки
+    post = await db.get(Post, shift.post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
     # Проверка: город сотрудника должен совпадать с городом поста (если worker)
-    if user.role == "worker" and user.city_id != shift.post.city_id:
+    if user.role == "worker" and user.city_id != post.city_id:
         raise HTTPException(status_code=400, detail="Worker city does not match post city")
+
     # Проверка: не больше max_workers
     stmt = select(ShiftAssignment).where(ShiftAssignment.shift_id == shift_id)
     result = await db.execute(stmt)
-    if len(list(result.scalars())) >= shift.post.max_workers:
+    if len(list(result.scalars())) >= post.max_workers:
         raise HTTPException(status_code=400, detail="Max workers reached")
+
     # Проверка: не назначен ли уже в эту смену
     stmt = select(ShiftAssignment).where(ShiftAssignment.shift_id == shift_id, ShiftAssignment.user_id == user_id)
     result = await db.execute(stmt)
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="User already assigned to this shift")
+
     # Проверка: нет ли смены у сотрудника в тот же день
     from datetime import date
     stmt = select(Shift).join(ShiftAssignment).where(
@@ -301,12 +310,14 @@ async def assign_to_shift(shift_id: int, user_id: str, is_leader: bool = False, 
     result = await db.execute(stmt)
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="User already assigned to another shift on this day")
+
     # Только один старший на смене
     if is_leader:
         stmt = select(ShiftAssignment).where(ShiftAssignment.shift_id == shift_id, ShiftAssignment.is_leader == True)
         result = await db.execute(stmt)
         if result.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Only one leader per shift")
+
     assignment = ShiftAssignment(shift_id=shift_id, user_id=user_id, is_leader=is_leader)
     db.add(assignment)
     await db.commit()
