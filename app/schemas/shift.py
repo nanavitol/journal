@@ -1,6 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from datetime import date, datetime
 from typing import Optional
+import uuid
 
 class ShiftBase(BaseModel):
     post_id: int
@@ -23,6 +24,13 @@ class ShiftResponse(ShiftBase):
     id: int
     created_by: Optional[str] = None
     created_at: datetime
+
+    @field_validator('created_by', mode='before')
+    @classmethod
+    def parse_uuid(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
 
     class Config:
         from_attributes = True

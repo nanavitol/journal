@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 from typing import Optional
+import uuid
 
 class UserBase(BaseModel):
     email: str
@@ -27,6 +28,13 @@ class UserResponse(UserBase):
     password_changed: bool
     photo_url: Optional[str] = None
     created_at: datetime
+
+    @field_validator('id', mode='before')
+    @classmethod
+    def parse_uuid(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
 
     class Config:
         from_attributes = True
