@@ -29,7 +29,7 @@ WORKER_RESPONSE=$(curl -sS -X 'POST' \
   -H 'Content-Type: application/json' \
   -d '{
   "login": "MorozovMNK",
-  "password": "correct_worker_password"
+  "password": "Morozov1234"
 }')
 echo "$WORKER_RESPONSE" | jq
 WORKER_TOKEN=$(echo "$WORKER_RESPONSE" | jq -r '.access_token')
