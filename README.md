@@ -355,7 +355,7 @@
 #### Обновить свой профиль
 **Endpoint:** `PUT /worker/profile`
 
-**Тело запроса:** [UserUpdate](#userupdate) (только поля, доступные для работника: `photo_url`, `rank`, `phone`)
+**Тело запроса:** [UserUpdate](#userupdate) (только поля, доступные для работника: `photo_url`, `phone`)
 
 **Ответ:** [UserResponse](#userresponse)
 
